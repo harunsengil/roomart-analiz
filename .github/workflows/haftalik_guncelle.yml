@@ -2,8 +2,8 @@ name: Haftalik Roomart Guncelleme
 
 on:
   schedule:
-    - cron: '0 10 * * 1'
-  workflow_dispatch:
+    - cron: '0 10 * * 1'   # Her Pazartesi 13:00 TR (UTC+3 = UTC 10:00)
+  workflow_dispatch:         # Elle de çalıştırılabilir
 
 permissions:
   contents: write
@@ -11,6 +11,7 @@ permissions:
 jobs:
   guncelle:
     runs-on: ubuntu-latest
+    timeout-minutes: 30      # Max 30 dk, sonra iptal
 
     steps:
       - name: Repository'i indir
@@ -21,14 +22,40 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Bagimliliklari yukle
-        run: |
-          pip install playwright pytrends requests pandas openpyxl
-          playwright install chromium --with-deps
+      # ── pip cache ──────────────────────────────────
+      - name: pip cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-roomart-v1
+          restore-keys: pip-roomart-
 
+      # ── Playwright binary cache ────────────────────
+      - name: Playwright cache
+        uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1223
+          restore-keys: playwright-chromium-
+
+      - name: Bagimliliklari yukle
+        run: pip install playwright pytrends requests pandas openpyxl
+
+      - name: Chromium kur (sadece cache miss'te)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: playwright install chromium --with-deps
+
+      - name: Chromium sistem bagimliliklari (cache varsa)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
+
+      # ── Ana script ─────────────────────────────────
       - name: Veri cek ve JSON guncelle
+        id: veri_cek
         run: python scripts/guncelle.py
 
+      # ── Git push ───────────────────────────────────
       - name: Degisiklikleri kaydet
         run: |
           git config user.name "github-actions[bot]"
@@ -36,3 +63,21 @@ jobs:
           git add data/urunler.json data/snapshots.json
           git diff --staged --quiet || git commit -m "Haftalik guncelleme $(date +'%Y-%m-%d')"
           git push
+
+      # ── Başarı özeti ───────────────────────────────
+      - name: Ozet
+        if: success()
+        run: |
+          echo "## Güncelleme Başarılı ✅" >> $GITHUB_STEP_SUMMARY
+          echo "**Tarih:** $(date +'%Y-%m-%d %H:%M')" >> $GITHUB_STEP_SUMMARY
+          echo "**Dashboard:** https://harunsengil.github.io/roomart-analiz" >> $GITHUB_STEP_SUMMARY
+          URUN=$(python -c "import json; d=json.load(open('data/urunler.json')); print(d['meta']['urun_sayi'])")
+          echo "**Ürün sayısı:** $URUN" >> $GITHUB_STEP_SUMMARY
+
+      # ── Hata bildirimi ─────────────────────────────
+      - name: Hata bildirimi
+        if: failure()
+        run: |
+          echo "## Güncelleme Başarısız ❌" >> $GITHUB_STEP_SUMMARY
+          echo "**Tarih:** $(date +'%Y-%m-%d %H:%M')" >> $GITHUB_STEP_SUMMARY
+          echo "**Actions:** https://github.com/harunsengil/roomart-analiz/actions" >> $GITHUB_STEP_SUMMARY
