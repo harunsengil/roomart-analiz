@@ -1,0 +1,39 @@
+name: Haftalik Roomart Guncelleme
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'  # Her Pazartesi 13:00 TR (UTC+3 = UTC 10:00)
+  workflow_dispatch:       # Elle de calistirabilirsin
+
+jobs:
+  guncelle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository'i indir
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Bagimliliklari yukle
+        run: |
+          pip install playwright pytrends requests pandas openpyxl
+          playwright install chromium --with-deps
+
+      - name: Veri cek ve JSON guncelle
+        run: python scripts/guncelle.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Degisiklikleri kaydet
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/urunler.json data/snapshots.json
+          git diff --staged --quiet || git commit -m "Haftalik guncelleme $(date +'%Y-%m-%d')"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
