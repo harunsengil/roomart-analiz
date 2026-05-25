@@ -1,1 +1,15 @@
-{}
+{
+  "tarih": "2026-05-25",
+  "rakipler": {},
+  "roomart": {
+    "ad": "Roomart",
+    "renk": "#1D3557",
+    "ozet": {
+      "urun_sayisi": 144,
+      "ort_fiyat": 8367.05,
+      "ort_puan": 4.57,
+      "toplam_deg": 6624,
+      "ort_deg": 46.0
+    }
+  }
+}
